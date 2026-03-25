@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"C:\\\\Users\\\\Usuário\\\\Desktop\\\\Diego\\\\IA\\\\crmarmazem\" && npx tsc --noEmit 2>&1 | head -100)",
+      "Bash(cd \"C:\\\\Users\\\\Usuário\\\\Desktop\\\\Diego\\\\IA\\\\crmarmazem\" && npm run build 2>&1 | tail -50)",
+      "Bash(cd \"C:\\\\Users\\\\Usuário\\\\Desktop\\\\Diego\\\\IA\\\\crmarmazem\" && npx eslint src/pages/AprovacaoEmails.tsx src/pages/Compradores.tsx 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\Usuário\\\\Desktop\\\\Diego\\\\IA\\\\crmarmazem\" && npx eslint src/ 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\Usuário\\\\Desktop\\\\Diego\\\\IA\\\\crmarmazem\" && npx tsc --noEmit 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\Usuário\\\\Desktop\\\\Diego\\\\IA\\\\crmarmazem\" && npx tsc --noEmit)",
+      "Bash(cd \"C:\\\\Users\\\\Usuário\\\\Desktop\\\\Diego\\\\IA\\\\crmarmazem\" && npm run dev)",
+      "Bash(find . -name \"*.sql\" -o -name \"*schema*\" -o -name \"*migrations*\" 2>/dev/null | head -20)",
+      "Bash(cd \"C:\\\\Users\\\\Usuário\\\\Desktop\\\\Diego\\\\IA\\\\crmarmazem\" && npx supabase db push 2>&1 | head -30)",
+      "Bash(cd \"C:\\\\Users\\\\Usuário\\\\Desktop\\\\Diego\\\\IA\\\\crmarmazem\" && npx supabase db push 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\Usuário\\\\Desktop\\\\Diego\\\\IA\\\\crmarmazem\" && npx supabase link --project-ref vbsjvyfqvgazuamyeflw 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\Usuário\\\\Desktop\\\\Diego\\\\IA\\\\crmarmazem\" && git add -A)",
+      "Bash(cd \"C:\\\\Users\\\\Usuário\\\\Desktop\\\\Diego\\\\IA\\\\crmarmazem\" && git commit -m*)",
+      "Bash(cd \"C:\\\\Users\\\\Usuário\\\\Desktop\\\\Diego\\\\IA\\\\crmarmazem\" && git push origin main)",
+      "Bash(cd \"C:\\\\Users\\\\Usuário\\\\Desktop\\\\Diego\\\\IA\\\\crmarmazem\" && git push)",
+      "Bash(cd \"C:\\\\Users\\\\Usuário\\\\Desktop\\\\Diego\\\\IA\\\\crmarmazem\" && git status)",
+      "Bash(cd \"C:\\\\Users\\\\Usuário\\\\Desktop\\\\Diego\\\\IA\\\\crmarmazem\" && git diff --stat)",
+      "Bash(cd \"C:\\\\Users\\\\Usuário\\\\Desktop\\\\Diego\\\\IA\\\\crmarmazem\" && git log --oneline -10)",
+      "Bash(cd \"C:\\\\Users\\\\Usuário\\\\Desktop\\\\Diego\\\\IA\\\\crmarmazem\" && npx skills add https://github.com/czlonkowski/n8n-skills --skill n8n-workflow-patterns 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\Usuário\\\\Desktop\\\\Diego\\\\IA\\\\crmarmazem\" && npx skills add https://github.com/czlonkowski/n8n-skills --skill n8n-workflow-patterns --yes 2>&1)",
+      "Bash(npx supabase:*)",
+      "Bash(curl -s https://gqbfrnuhowzugjwqxrnj.supabase.co/rest/v1/compradores?select=count -H 'apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxYmZybnVob3d6dWdqd3F4cm5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNzc0MDQsImV4cCI6MjA4ODY1MzQwNH0.bSRbeLxL6skZdn96hob6MWxnJUOdrBvlyJrHs5ou3wk' -H 'Prefer: count=exact' -I)",
+      "Bash(grep:*)",
+      "Bash(npm run:*)"
+    ]
+  }
+}
