@@ -42,6 +42,13 @@ export const ExcelImporter = ({ onComplete }: { onComplete: () => void }) => {
             const parsed = parseTocsTemplate(workbook);
             let totalImported = 0;
 
+            // Fetch existing names to prevent duplicates
+            const { data: existingIngredients } = await supabase.from('ingredients').select('name').eq('restaurant_id', restaurantId);
+            const { data: existingRecipes } = await supabase.from('recipes').select('product_name').eq('restaurant_id', restaurantId);
+
+            const existingIngNames = new Set((existingIngredients || []).map(i => i.name.toLowerCase()));
+            const existingRecNames = new Set((existingRecipes || []).map(r => r.product_name.toLowerCase()));
+
             for (const { sheet, rows } of parsed) {
                 const config = TEMPLATE_STRUCTURE[sheet];
                 addLog(`\n🔄 Processando '${sheet}' (${rows.length} linhas)...`);
@@ -56,15 +63,21 @@ export const ExcelImporter = ({ onComplete }: { onComplete: () => void }) => {
                         avg_cost_per_unit: cellNum(r['Custo Unitário'] ?? r['Custo Total'] ?? r['Preço de Compra']),
                         stock_quantity: 0,
                         type: config.typeValue,
-                    }));
+                    })).filter(p => !existingIngNames.has(p.name.toLowerCase()));
                 } else {
                     payload = rows.map(r => ({
                         restaurant_id: restaurantId,
                         product_name: String(r['Nome']).trim(),
                         sale_price: cellNum(r['Preço de Venda']),
                         category: config.typeValue,
-                    }));
+                    })).filter(p => !existingRecNames.has(p.product_name.toLowerCase()));
                 }
+
+                if (payload.length === 0) {
+                    addLog(`⏭️ Nenhum item novo em '${sheet}' (duplicados ignorados).`);
+                    continue;
+                }
+
 
                 const { error } = await supabase.from(config.table).insert(payload as any);
                 if (error) {

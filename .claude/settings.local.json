@@ -24,7 +24,9 @@
       "Bash(npx supabase:*)",
       "Bash(curl -s https://gqbfrnuhowzugjwqxrnj.supabase.co/rest/v1/compradores?select=count -H 'apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxYmZybnVob3d6dWdqd3F4cm5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNzc0MDQsImV4cCI6MjA4ODY1MzQwNH0.bSRbeLxL6skZdn96hob6MWxnJUOdrBvlyJrHs5ou3wk' -H 'Prefer: count=exact' -I)",
       "Bash(grep:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Skill(frontend-design)",
+      "Skill(frontend-design:*)"
     ]
   }
 }

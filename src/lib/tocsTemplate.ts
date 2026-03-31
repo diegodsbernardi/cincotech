@@ -16,8 +16,8 @@ export const TEMPLATE_STRUCTURE = {
     Preparos: {
         table: 'ingredients' as const,
         typeValue: 'preparo',
-        columns: ['Nome', 'Unidade', 'Custo Total'],
-        example: [['Molho da Casa', 'l', 12.00], ['Maionese Temperada', 'kg', 18.50]],
+        columns: ['Nome', 'Unidade'],
+        example: [['Molho da Casa', 'l'], ['Maionese Temperada', 'kg']],
     },
     Bebidas: {
         table: 'ingredients' as const,
@@ -59,7 +59,7 @@ export const downloadTemplate = () => {
 
     for (const [sheetName, config] of Object.entries(TEMPLATE_STRUCTURE)) {
         const data = [config.columns, ...config.example];
-        const ws = XLSX.utils.aoa_to_sheet(data);
+        const ws = XLSX.utils.aoa_to_sheet(data as unknown as any[][]);
 
         // Style header row width
         ws['!cols'] = config.columns.map(() => ({ wch: 28 }));
