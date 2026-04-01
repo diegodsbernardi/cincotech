@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { ChefHat, Plus, Trash2, Edit, Search, X, ArrowRight } from 'lucide-react';
 import type { Ingredient, Recipe, RecipeIngredient } from '../lib/types';
+import { fmtMoney, fmtQty } from '../lib/format';
 
 const UNIT_OPTIONS = ['un', 'porção', 'g', 'ml', 'kg', 'l'];
 
@@ -27,12 +28,17 @@ export const Preparos = () => {
     const [newSelIngId, setNewSelIngId] = useState('');
     const [newSelQty, setNewSelQty] = useState<number | ''>('');
     const [newDropdown, setNewDropdown] = useState(false);
+    const [newInputUnit, setNewInputUnit] = useState<'kg' | 'g'>('kg');
 
-    // Modal: editar composição
+    // Modal: editar composição + info básica
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editItems, setEditItems] = useState<RecipeIngredient[]>([]);
+    const [editItemUnits, setEditItemUnits] = useState<Record<number, 'kg' | 'g'>>({});
+    const [editPreparoName, setEditPreparoName] = useState('');
+    const [editPreparoYield, setEditPreparoYield] = useState<number | ''>(1);
     const [ingSearch, setIngSearch] = useState('');
     const [selectedIngId, setSelectedIngId] = useState('');
+    const [editInputUnit, setEditInputUnit] = useState<'kg' | 'g'>('kg');
     const [selectedQty, setSelectedQty] = useState<number | ''>('');
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [savingEdit, setSavingEdit] = useState(false);
@@ -99,6 +105,7 @@ export const Preparos = () => {
             category: 'Preparo',
             sale_price: 0,
             yield_quantity: Number(newYield) || 1,
+            unit_type: newUnit,
         }]).select().single();
 
         if (!error && data) {
@@ -123,26 +130,32 @@ export const Preparos = () => {
         setSavingNew(false);
     };
 
+
     const handleAddNewItem = () => {
         if (!newSelIngId || newSelQty === '' || Number(newSelQty) <= 0) return;
         const ing = ingredients.find(i => i.id === newSelIngId);
         if (!ing) return;
+        const qty = ing.unit_type === 'kg' && newInputUnit === 'g'
+            ? Number(newSelQty) / 1000
+            : Number(newSelQty);
         setNewItems(prev => [...prev, {
             id: Math.random().toString(),
             recipe_id: '',
             ingredient_id: ing.id,
-            quantity_needed: Number(newSelQty),
+            quantity_needed: qty,
             ingredients: ing,
         }]);
         setNewSelIngId(''); setNewIngSearch(''); setNewSelQty('');
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Excluir este preparo? Fichas finais que o usam serão afetadas.')) return;
+        if (!confirm('Excluir este preparo? Esta ação não pode ser desfeita.')) return;
         const { error } = await supabase.from('recipes').delete().eq('id', id);
         if (!error) {
             setPreparos(prev => prev.filter(p => p.id !== id));
             toast.success('Preparo excluído.');
+        } else if (error.code === '23503') {
+            toast.error('Este preparo está sendo usado em fichas finais e não pode ser excluído.');
         } else {
             toast.error('Erro ao excluir: ' + error.message);
         }
@@ -151,6 +164,9 @@ export const Preparos = () => {
     const openEditModal = (preparo: Recipe) => {
         setEditingId(preparo.id);
         setEditItems(JSON.parse(JSON.stringify(compositions[preparo.id] ?? [])));
+        setEditItemUnits({});
+        setEditPreparoName(preparo.product_name);
+        setEditPreparoYield(preparo.yield_quantity);
         setIngSearch(''); setSelectedIngId(''); setSelectedQty('');
     };
 
@@ -158,11 +174,14 @@ export const Preparos = () => {
         if (!selectedIngId || selectedQty === '' || Number(selectedQty) <= 0) return;
         const ing = ingredients.find(i => i.id === selectedIngId);
         if (!ing) return;
+        const qty = ing.unit_type === 'kg' && editInputUnit === 'g'
+            ? Number(selectedQty) / 1000
+            : Number(selectedQty);
         setEditItems(prev => [...prev, {
             id: Math.random().toString(),
             recipe_id: editingId!,
             ingredient_id: ing.id,
-            quantity_needed: Number(selectedQty),
+            quantity_needed: qty,
             ingredients: ing,
         }]);
         setSelectedIngId(''); setIngSearch(''); setSelectedQty('');
@@ -172,21 +191,43 @@ export const Preparos = () => {
         if (!editingId) return;
         setSavingEdit(true);
 
-        await supabase.from('recipe_ingredients').delete().eq('recipe_id', editingId);
+        const { error: delError } = await supabase.from('recipe_ingredients').delete().eq('recipe_id', editingId);
+        if (delError) {
+            toast.error('Erro ao salvar: ' + delError.message);
+            setSavingEdit(false);
+            return;
+        }
+
         if (editItems.length > 0) {
-            await supabase.from('recipe_ingredients').insert(
+            const { error: insError } = await supabase.from('recipe_ingredients').insert(
                 editItems.map(ei => ({
                     recipe_id: editingId,
                     ingredient_id: ei.ingredient_id,
                     quantity_needed: ei.quantity_needed,
                 }))
             );
+            if (insError) {
+                toast.error('Erro ao salvar composição: ' + insError.message);
+                setSavingEdit(false);
+                fetchData(); // restaura estado do banco
+                return;
+            }
         }
 
+        // Salva nome e rendimento
+        await supabase.from('recipes').update({
+            product_name: editPreparoName.trim() || editingPreparo?.product_name,
+            yield_quantity: Number(editPreparoYield) || 1,
+        }).eq('id', editingId);
+
+        setPreparos(prev => prev.map(p => p.id === editingId
+            ? { ...p, product_name: editPreparoName.trim() || p.product_name, yield_quantity: Number(editPreparoYield) || 1 }
+            : p
+        ));
         setCompositions(prev => ({ ...prev, [editingId]: editItems }));
         setEditingId(null);
         setSavingEdit(false);
-        toast.success('Composição salva!');
+        toast.success('Preparo salvo!');
     };
 
     const editingPreparo = preparos.find(p => p.id === editingId);
@@ -219,19 +260,19 @@ export const Preparos = () => {
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 bg-white border border-slate-200 rounded-2xl shadow-sm">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 flex items-center">
-                        <ChefHat className="w-6 h-6 mr-3 text-amber-500" />
+                    <h1 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center">
+                        <ChefHat className="w-5 h-5 sm:w-6 sm:h-6 mr-2.5 text-amber-500" />
                         Preparos
                     </h1>
-                    <p className="text-slate-500 mt-1">
+                    <p className="text-slate-500 mt-1 hidden sm:block">
                         Mini-receitas de porções padrão. Definem o custo por unidade usada nas fichas finais.
                     </p>
                 </div>
                 <button
                     onClick={() => setShowNewModal(true)}
-                    className="mt-4 sm:mt-0 flex items-center px-4 py-2 bg-amber-500 text-white font-medium rounded-lg hover:bg-amber-600 transition-colors shadow-sm text-sm"
+                    className="mt-3 sm:mt-0 w-full sm:w-auto flex items-center justify-center px-4 py-2 bg-amber-500 text-white font-semibold rounded-lg hover:bg-amber-600 transition-colors shadow-sm text-sm"
                 >
-                    <Plus className="w-4 h-4 mr-2" />
+                    <Plus className="w-4 h-4 mr-1.5" />
                     Novo Preparo
                 </button>
             </div>
@@ -268,14 +309,14 @@ export const Preparos = () => {
                                     <div>
                                         <h3 className="font-bold text-slate-900 text-base">{preparo.product_name}</h3>
                                         <p className="text-xs text-slate-500 mt-0.5">
-                                            Rende: <strong>{preparo.yield_quantity} {preparo.yield_quantity === 1 ? 'unidade' : 'unidades'}</strong>
+                                            Rende: <strong>{preparo.yield_quantity} {preparo.unit_type}</strong>
                                         </p>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         {/* Custo por unidade — métrica principal */}
                                         <div className="text-right">
                                             <p className="text-xs text-slate-400">Custo / un</p>
-                                            <p className="text-base font-bold text-amber-600">R$ {perUnit.toFixed(4)}</p>
+                                            <p className="text-base font-bold text-amber-600">R$ {fmtMoney(perUnit)}</p>
                                         </div>
                                         <button
                                             onClick={() => handleDelete(preparo.id)}
@@ -296,10 +337,10 @@ export const Preparos = () => {
                                                 <li key={item.id} className="flex justify-between items-center text-sm">
                                                     <span className="text-slate-700 font-medium">{item.ingredients.name}</span>
                                                     <div className="flex items-center gap-3 text-slate-500">
-                                                        <span>{item.quantity_needed} {item.ingredients.unit_type}</span>
+                                                        <span>{fmtQty(item.quantity_needed, item.ingredients.unit_type)} {item.ingredients.unit_type}</span>
                                                         <ArrowRight className="w-3 h-3 text-slate-300" />
                                                         <span className="font-semibold text-slate-700">
-                                                            R$ {(item.ingredients.avg_cost_per_unit * item.quantity_needed).toFixed(4)}
+                                                            R$ {fmtMoney(item.ingredients.avg_cost_per_unit * item.quantity_needed)}
                                                         </span>
                                                     </div>
                                                 </li>
@@ -311,7 +352,7 @@ export const Preparos = () => {
                                 {/* Footer */}
                                 <div className="px-5 py-3 border-t border-slate-100 flex justify-between items-center bg-slate-50">
                                     <span className="text-xs text-slate-500">
-                                        Custo total: <strong className="text-slate-700">R$ {total.toFixed(4)}</strong>
+                                        Custo total: <strong className="text-slate-700">R$ {fmtMoney(total)}</strong>
                                     </span>
                                     <button
                                         onClick={() => openEditModal(preparo)}
@@ -383,17 +424,15 @@ export const Preparos = () => {
                                             min="0.001"
                                             onFocus={e => e.target.select()}
                                             onChange={e => {
-                                                const v = Number(e.target.value);
-                                                if (v <= 0) return;
                                                 const next = [...newItems];
-                                                next[idx] = { ...next[idx], quantity_needed: v };
+                                                next[idx] = { ...next[idx], quantity_needed: Number(e.target.value) || 0 };
                                                 setNewItems(next);
                                             }}
                                             className="w-20 px-2 py-1 border border-slate-300 rounded-lg text-right text-sm focus:ring-2 focus:ring-amber-400 outline-none"
                                         />
                                         <span className="text-xs text-slate-400 w-6 font-medium">{item.ingredients.unit_type}</span>
                                         <span className="text-sm font-semibold text-slate-600 w-20 text-right">
-                                            R$ {(item.ingredients.avg_cost_per_unit * item.quantity_needed).toFixed(4)}
+                                            R$ {fmtMoney(item.ingredients.avg_cost_per_unit * item.quantity_needed)}
                                         </span>
                                         <button onClick={() => setNewItems(newItems.filter((_, i) => i !== idx))} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all">
                                             <Trash2 className="w-3.5 h-3.5" />
@@ -404,8 +443,8 @@ export const Preparos = () => {
 
                             {/* Picker de insumo */}
                             <div className="px-6 py-4 border-t border-slate-100">
-                                <div className="flex gap-2">
-                                    <div className="flex-1 relative">
+                                <div className="flex flex-col gap-2">
+                                    <div className="relative">
                                         <div className="flex items-center gap-2 px-3 py-2 border border-slate-300 rounded-lg bg-white focus-within:ring-2 focus-within:ring-amber-400">
                                             <Search className="w-4 h-4 text-slate-400 shrink-0" />
                                             <input
@@ -437,10 +476,18 @@ export const Preparos = () => {
                                             </div>
                                         )}
                                     </div>
-                                    <input type="number" value={newSelQty} onChange={e => setNewSelQty(e.target.value === '' ? '' : Number(e.target.value))} placeholder="Qtd" className="w-20 px-3 py-2 border border-slate-300 rounded-lg text-sm text-center focus:ring-2 focus:ring-amber-400 outline-none" />
-                                    <button onClick={handleAddNewItem} disabled={!newSelIngId || newSelQty === '' || Number(newSelQty) <= 0} className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-medium rounded-lg transition-colors shrink-0">
-                                        + Add
-                                    </button>
+                                    <div className="flex gap-2">
+                                        <input type="number" value={newSelQty} onChange={e => setNewSelQty(e.target.value === '' ? '' : Number(e.target.value))} placeholder="Qtd" className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm text-center focus:ring-2 focus:ring-amber-400 outline-none" />
+                                        {ingredients.find(i => i.id === newSelIngId)?.unit_type === 'kg' && (
+                                            <div className="flex rounded-lg border border-slate-300 overflow-hidden text-xs font-bold shrink-0">
+                                                <button onClick={() => setNewInputUnit('g')} className={`px-2 py-2 transition-colors ${newInputUnit === 'g' ? 'bg-amber-500 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>g</button>
+                                                <button onClick={() => setNewInputUnit('kg')} className={`px-2 py-2 transition-colors ${newInputUnit === 'kg' ? 'bg-amber-500 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>kg</button>
+                                            </div>
+                                        )}
+                                        <button onClick={handleAddNewItem} disabled={!newSelIngId || newSelQty === '' || Number(newSelQty) <= 0} className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-medium rounded-lg transition-colors shrink-0">
+                                            + Add
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -449,7 +496,7 @@ export const Preparos = () => {
                                 {newItems.length > 0 && (
                                     <span className="text-sm text-slate-500">
                                         Custo: <strong className="text-amber-600">
-                                            R$ {(newItems.reduce((a, i) => a + i.ingredients.avg_cost_per_unit * i.quantity_needed, 0) / (Number(newYield) || 1)).toFixed(4)}
+                                            R$ {fmtMoney(newItems.reduce((a, i) => a + i.ingredients.avg_cost_per_unit * i.quantity_needed, 0) / (Number(newYield) || 1))}
                                         </strong> /un
                                     </span>
                                 )}
@@ -475,14 +522,34 @@ export const Preparos = () => {
                         <div className="bg-white w-full sm:rounded-2xl sm:max-w-xl flex flex-col shadow-2xl">
 
                             {/* Header */}
-                            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center shrink-0">
-                                <div>
-                                    <h2 className="text-lg font-bold text-slate-900">Composição</h2>
-                                    <p className="text-sm text-slate-400">{editingPreparo.product_name} · rende {editingPreparo.yield_quantity} un</p>
+                            <div className="px-6 py-4 border-b border-slate-100 shrink-0">
+                                <div className="flex justify-between items-center mb-3">
+                                    <h2 className="text-lg font-bold text-slate-900">Editar Preparo</h2>
+                                    <button onClick={() => setEditingId(null)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
+                                        <X className="w-5 h-5" />
+                                    </button>
                                 </div>
-                                <button onClick={() => setEditingId(null)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg">
-                                    <X className="w-5 h-5" />
-                                </button>
+                                <div className="flex gap-3">
+                                    <input
+                                        type="text"
+                                        value={editPreparoName}
+                                        onChange={e => setEditPreparoName(e.target.value)}
+                                        className="flex-1 px-3 py-1.5 border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-amber-400 outline-none"
+                                        placeholder="Nome do preparo"
+                                    />
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs text-slate-400 whitespace-nowrap">Rende</span>
+                                        <input
+                                            type="number"
+                                            value={editPreparoYield}
+                                            min="1"
+                                            onFocus={e => e.target.select()}
+                                            onChange={e => setEditPreparoYield(e.target.value === '' ? '' : Number(e.target.value))}
+                                            className="w-16 px-2 py-1.5 border border-slate-300 rounded-lg text-sm text-center focus:ring-2 focus:ring-amber-400 outline-none"
+                                        />
+                                        <span className="text-xs text-slate-400">un</span>
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Lista de insumos */}
@@ -491,26 +558,37 @@ export const Preparos = () => {
                                     <div className="text-center py-8 text-slate-400 border-2 border-dashed border-slate-200 rounded-xl text-sm">
                                         Nenhum insumo. Adicione abaixo.
                                     </div>
-                                ) : editItems.map((item, idx) => (
-                                    <div key={item.id} className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 group">
+                                ) : editItems.map((item, idx) => {
+                                    const isKg = item.ingredients.unit_type === 'kg';
+                                    const displayUnit = isKg ? (editItemUnits[idx] ?? 'kg') : item.ingredients.unit_type;
+                                    const displayQty = isKg && displayUnit === 'g' ? item.quantity_needed * 1000 : item.quantity_needed;
+                                    return (
+                                    <div key={item.id} className="flex items-center gap-2 px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 group">
                                         <span className="flex-1 font-medium text-slate-800 text-sm truncate">{item.ingredients.name}</span>
                                         <input
                                             type="number"
-                                            value={item.quantity_needed}
+                                            value={displayQty || ''}
                                             min="0.001"
                                             onFocus={e => e.target.select()}
                                             onChange={e => {
-                                                const v = Number(e.target.value);
-                                                if (v <= 0) return;
+                                                const v = Number(e.target.value) || 0;
+                                                const stored = isKg && displayUnit === 'g' ? v / 1000 : v;
                                                 const next = [...editItems];
-                                                next[idx] = { ...next[idx], quantity_needed: v };
+                                                next[idx] = { ...next[idx], quantity_needed: stored };
                                                 setEditItems(next);
                                             }}
                                             className="w-20 px-2 py-1 border border-slate-300 rounded-lg text-right text-sm focus:ring-2 focus:ring-amber-400 outline-none"
                                         />
-                                        <span className="text-xs text-slate-400 w-6 font-medium">{item.ingredients.unit_type}</span>
+                                        {isKg ? (
+                                            <div className="flex rounded-lg border border-slate-300 overflow-hidden text-xs font-bold shrink-0">
+                                                <button onClick={() => setEditItemUnits(u => ({ ...u, [idx]: 'g' }))} className={`px-1.5 py-1 transition-colors ${displayUnit === 'g' ? 'bg-amber-500 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>g</button>
+                                                <button onClick={() => setEditItemUnits(u => ({ ...u, [idx]: 'kg' }))} className={`px-1.5 py-1 transition-colors ${displayUnit === 'kg' ? 'bg-amber-500 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>kg</button>
+                                            </div>
+                                        ) : (
+                                            <span className="text-xs text-slate-400 w-6 font-medium">{item.ingredients.unit_type}</span>
+                                        )}
                                         <span className="text-sm font-semibold text-slate-600 w-20 text-right">
-                                            R$ {(item.ingredients.avg_cost_per_unit * item.quantity_needed).toFixed(4)}
+                                            R$ {fmtMoney(item.ingredients.avg_cost_per_unit * item.quantity_needed)}
                                         </span>
                                         <button
                                             onClick={() => setEditItems(editItems.filter((_, i) => i !== idx))}
@@ -519,14 +597,15 @@ export const Preparos = () => {
                                             <Trash2 className="w-3.5 h-3.5" />
                                         </button>
                                     </div>
-                                ))}
+                                    );
+                                })}
                             </div>
 
                             {/* Adicionar insumo */}
                             <div className="px-6 py-4 border-t border-slate-100 shrink-0">
                                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Adicionar insumo base</p>
-                                <div className="flex gap-2">
-                                    <div className="flex-1 relative">
+                                <div className="flex flex-col gap-2">
+                                    <div className="relative">
                                         <div className="flex items-center gap-2 px-3 py-2 border border-slate-300 rounded-lg bg-white focus-within:ring-2 focus-within:ring-amber-400 focus-within:border-transparent">
                                             <Search className="w-4 h-4 text-slate-400 shrink-0" />
                                             <input
@@ -563,20 +642,28 @@ export const Preparos = () => {
                                             </div>
                                         )}
                                     </div>
-                                    <input
-                                        type="number"
-                                        value={selectedQty}
-                                        onChange={e => setSelectedQty(e.target.value === '' ? '' : Number(e.target.value))}
-                                        placeholder="Qtd"
-                                        className="w-20 px-3 py-2 border border-slate-300 rounded-lg text-sm text-center focus:ring-2 focus:ring-amber-400 outline-none"
-                                    />
-                                    <button
-                                        onClick={handleAddItem}
-                                        disabled={!selectedIngId || selectedQty === '' || Number(selectedQty) <= 0}
-                                        className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-medium rounded-lg transition-colors shrink-0"
-                                    >
-                                        + Add
-                                    </button>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="number"
+                                            value={selectedQty}
+                                            onChange={e => setSelectedQty(e.target.value === '' ? '' : Number(e.target.value))}
+                                            placeholder="Qtd"
+                                            className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm text-center focus:ring-2 focus:ring-amber-400 outline-none"
+                                        />
+                                        {ingredients.find(i => i.id === selectedIngId)?.unit_type === 'kg' && (
+                                            <div className="flex rounded-lg border border-slate-300 overflow-hidden text-xs font-bold shrink-0">
+                                                <button onClick={() => setEditInputUnit('g')} className={`px-2 py-2 transition-colors ${editInputUnit === 'g' ? 'bg-amber-500 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>g</button>
+                                                <button onClick={() => setEditInputUnit('kg')} className={`px-2 py-2 transition-colors ${editInputUnit === 'kg' ? 'bg-amber-500 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>kg</button>
+                                            </div>
+                                        )}
+                                        <button
+                                            onClick={handleAddItem}
+                                            disabled={!selectedIngId || selectedQty === '' || Number(selectedQty) <= 0}
+                                            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-medium rounded-lg transition-colors shrink-0"
+                                        >
+                                            + Add
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -584,10 +671,10 @@ export const Preparos = () => {
                             <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 sm:rounded-b-2xl flex justify-between items-center shrink-0">
                                 <div className="text-sm">
                                     <span className="text-slate-500">Custo total: </span>
-                                    <strong className="text-slate-900">R$ {editTotalCost.toFixed(4)}</strong>
+                                    <strong className="text-slate-900">R$ {fmtMoney(editTotalCost)}</strong>
                                     <span className="text-slate-400 mx-2">·</span>
                                     <span className="text-slate-500">Por unidade: </span>
-                                    <strong className="text-amber-600">R$ {editCostPerUnit.toFixed(4)}</strong>
+                                    <strong className="text-amber-600">R$ {fmtMoney(editCostPerUnit)}</strong>
                                 </div>
                                 <div className="flex gap-2">
                                     <button onClick={() => setEditingId(null)} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-sm font-medium">Cancelar</button>

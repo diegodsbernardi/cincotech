@@ -22,18 +22,18 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
             label: 'Produção',
             show: true,
             items: [
-                { to: '/recipes',     Icon: UtensilsCrossed, label: 'Fichas Técnicas', show: true },
+                { to: '/ingredients', Icon: Package,         label: 'Insumos',        show: isDonoOrGerente },
                 { to: '/preparos',    Icon: ChefHat,         label: 'Preparos',        show: true },
-                { to: '/ingredients', Icon: Package,          label: 'Insumos',         show: isDonoOrGerente },
+                { to: '/recipes',     Icon: UtensilsCrossed, label: 'Fichas Técnicas', show: true },
             ],
         },
         {
             label: 'Financeiro',
             show: canViewDashboard,
             items: [
-                { to: '/',              Icon: BarChart3,    label: 'Dashboard',      show: true },
-                { to: '/sales',         Icon: ShoppingBag,  label: 'Vendas',         show: canViewSales },
-                { to: '/notas-fiscais', Icon: FileText,     label: 'Notas Fiscais',  show: true },
+                { to: '/', Icon: BarChart3, label: 'Dashboard', show: true },
+                { to: '/sales', Icon: ShoppingBag, label: 'Vendas', show: canViewSales },
+                { to: '/notas-fiscais', Icon: FileText, label: 'Notas Fiscais', show: true },
             ],
         },
         {
@@ -45,6 +45,12 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
         },
     ];
 
+    const allNavItems = navGroups
+        .filter(g => g.show)
+        .flatMap(g => g.items.filter(i => i.show));
+    const bottomNavItems = allNavItems.slice(0, 4);
+    const hasOverflow = allNavItems.length > 4;
+
     const isActive = (to: string) =>
         to === '/' ? location.pathname === '/' : location.pathname.startsWith(to);
 
@@ -55,11 +61,10 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                 <Link
                     to={to}
                     onClick={() => setMobileOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        active
-                            ? 'font-semibold'
-                            : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
-                    }`}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${active
+                        ? 'font-semibold'
+                        : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+                        }`}
                     style={active ? { color: primary, backgroundColor: `${primary}14` } : undefined}
                 >
                     <Icon className="w-4 h-4 shrink-0" />
@@ -73,21 +78,27 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
         <div className="flex flex-col h-full">
 
             {/* Logo */}
-            <div className="h-14 flex items-center px-4 border-b border-slate-100 gap-3 shrink-0">
-                {logoUrl ? (
-                    <img src={logoUrl} alt="Logo" className="h-7 w-auto object-contain shrink-0" />
-                ) : (
+            {logoUrl ? (
+                <div className="px-5 py-5 border-b border-slate-100 shrink-0">
+                    <img
+                        src={logoUrl}
+                        alt={nomeRestaurante || 'Logo'}
+                        className="w-full h-auto object-contain"
+                    />
+                </div>
+            ) : (
+                <div className="h-14 flex items-center px-4 border-b border-slate-100 gap-3 shrink-0">
                     <div
                         className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
                         style={{ backgroundColor: primary }}
                     >
                         <UtensilsCrossed className="w-4 h-4 text-white" />
                     </div>
-                )}
-                <span className="text-sm font-bold text-slate-900 truncate">
-                    {nomeRestaurante ?? 'TOCS'}
-                </span>
-            </div>
+                    <span className="text-sm font-bold text-slate-900 truncate">
+                        {nomeRestaurante || ''}
+                    </span>
+                </div>
+            )}
 
             {/* Nav agrupada */}
             <nav className="flex-1 overflow-y-auto py-3 px-2">
@@ -181,10 +192,39 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                     </div>
                 </header>
 
-                <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+                <main className="flex-1 overflow-y-auto p-4 pb-20 md:p-6 md:pb-6 lg:p-8">
                     {children}
                 </main>
             </div>
+
+            {/* Bottom navigation (mobile only) */}
+            <nav className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-slate-100 flex md:hidden shadow-[0_-1px_3px_rgba(0,0,0,0.08)]">
+                {bottomNavItems.map(({ to, Icon, label }) => {
+                    const active = isActive(to);
+                    return (
+                        <Link
+                            key={to}
+                            to={to}
+                            className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[56px] transition-colors"
+                            style={active ? { color: primary } : undefined}
+                        >
+                            <Icon className={`w-5 h-5 ${active ? '' : 'text-slate-400'}`} />
+                            <span className={`text-[10px] font-medium leading-none ${active ? '' : 'text-slate-400'}`}>
+                                {label}
+                            </span>
+                        </Link>
+                    );
+                })}
+                {hasOverflow && (
+                    <button
+                        onClick={() => setMobileOpen(true)}
+                        className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[56px] text-slate-400"
+                    >
+                        <Menu className="w-5 h-5" />
+                        <span className="text-[10px] font-medium leading-none">Mais</span>
+                    </button>
+                )}
+            </nav>
         </div>
     );
 };

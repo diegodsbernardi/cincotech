@@ -6,7 +6,7 @@
 
 // ── Insumos (tabela: ingredients) ────────────────────────────
 
-export type IngredientTipo = 'insumo_base' | 'insumo_direto';
+export type IngredientTipo = 'insumo_base' | 'insumo_direto' | 'embalagem';
 
 /**
  * insumo_base   → vem de NF-e, entra em Preparos (ex: Queijo KG, Carne Moída KG)
@@ -17,6 +17,7 @@ export interface Ingredient {
     restaurant_id: string;
     name: string;
     tipo: IngredientTipo;
+    categoria?: string | null;
     unit_type: string;
     avg_cost_per_unit: number;
     stock_quantity: number;
@@ -43,6 +44,7 @@ export interface Recipe {
     category: string;
     tipo: RecipeTipo;
     yield_quantity: number; // relevante apenas para preparos; default 1
+    unit_type: string;      // unidade de saída do preparo (ex: 'g', 'un', 'porção')
 }
 
 // ── Composição: Ficha → Insumo Direto (tabela: recipe_ingredients) ──
@@ -52,7 +54,7 @@ export interface RecipeIngredient {
     recipe_id: string;
     ingredient_id: string;
     quantity_needed: number;
-    ingredients: Pick<Ingredient, 'id' | 'name' | 'unit_type' | 'avg_cost_per_unit'>;
+    ingredients: Pick<Ingredient, 'id' | 'name' | 'unit_type' | 'avg_cost_per_unit' | 'tipo'>;
 }
 
 // ── Composição: Ficha Final → Preparo (tabela: recipe_sub_recipes) ──

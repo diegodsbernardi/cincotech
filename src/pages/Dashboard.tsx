@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { TrendingDown, TrendingUp, AlertCircle, UtensilsCrossed } from 'lucide-react';
+import { TrendingDown, TrendingUp, AlertCircle, UtensilsCrossed, ChevronLeft, ChevronRight } from 'lucide-react';
 import { buildPreparoCostMap, calcFichaFinalCost, calcCMV } from '../lib/costCalculator';
+
+const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
 interface TopProduct {
     recipe_id: string;
@@ -22,9 +24,25 @@ export const Dashboard = () => {
     const [cmvPct, setCmvPct] = useState(0);
     const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
 
+    const now = new Date();
+    const [selYear, setSelYear] = useState(now.getFullYear());
+    const [selMonth, setSelMonth] = useState(now.getMonth()); // 0-indexed
+
+    const isCurrentMonth = selYear === now.getFullYear() && selMonth === now.getMonth();
+
+    const goToPrev = () => {
+        if (selMonth === 0) { setSelYear(y => y - 1); setSelMonth(11); }
+        else setSelMonth(m => m - 1);
+    };
+    const goToNext = () => {
+        if (isCurrentMonth) return;
+        if (selMonth === 11) { setSelYear(y => y + 1); setSelMonth(0); }
+        else setSelMonth(m => m + 1);
+    };
+
     useEffect(() => {
         if (user) fetchDashboardData();
-    }, [user]);
+    }, [user, selYear, selMonth]);
 
     const fetchDashboardData = async () => {
         setLoadingStats(true);
@@ -34,15 +52,16 @@ export const Dashboard = () => {
         const restaurantId = profile?.restaurant_id;
         if (!restaurantId) { setLoadingStats(false); return; }
 
-        const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        const startOfMonth = new Date(selYear, selMonth, 1).toISOString();
+        const endOfMonth   = new Date(selYear, selMonth + 1, 1).toISOString();
 
         // 6 fetches em paralelo — sem waterfall
         const [salesRes, stockAlertsRes, fichasRes, preparosRes, allIngsRes, subsRes] = await Promise.all([
             supabase.from('sales')
                 .select('recipe_id, quantity_sold, total_value')
                 .eq('restaurant_id', restaurantId)
-                .gte('sold_at', startOfMonth),
+                .gte('sold_at', startOfMonth)
+                .lt('sold_at', endOfMonth),
             supabase.from('ingredients')
                 .select('id', { count: 'exact', head: true })
                 .eq('restaurant_id', restaurantId)
@@ -152,13 +171,39 @@ export const Dashboard = () => {
         ? 'bg-slate-50'
         : cmvPct < 30 ? 'bg-green-50' : cmvPct < 40 ? 'bg-amber-50' : 'bg-red-50';
 
+    const header = (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+                <h1 className="text-2xl font-bold text-slate-900">Visão Geral do Restaurante</h1>
+                <p className="text-slate-500 text-sm mt-0.5">
+                    {isCurrentMonth ? 'Mês atual' : 'Período histórico'}
+                </p>
+            </div>
+            <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl px-1 py-1 shadow-sm self-start sm:self-auto">
+                <button
+                    onClick={goToPrev}
+                    className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                    <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-sm font-semibold text-slate-800 px-3 min-w-[130px] text-center">
+                    {MESES[selMonth]} {selYear}
+                </span>
+                <button
+                    onClick={goToNext}
+                    disabled={isCurrentMonth}
+                    className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                    <ChevronRight className="w-4 h-4" />
+                </button>
+            </div>
+        </div>
+    );
+
     if (loadingStats) {
         return (
             <div className="max-w-7xl mx-auto space-y-6">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Visão Geral do Restaurante</h1>
-                    <p className="text-slate-500">Métricas do mês atual.</p>
-                </div>
+                {header}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {[1, 2, 3].map(i => (
                         <div key={i} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm animate-pulse">
@@ -173,16 +218,13 @@ export const Dashboard = () => {
 
     return (
         <div className="max-w-7xl mx-auto space-y-6">
-            <div>
-                <h1 className="text-2xl font-bold text-slate-900">Visão Geral do Restaurante</h1>
-                <p className="text-slate-500">Métricas atualizadas do mês corrente.</p>
-            </div>
+            {header}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* CMV */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm transition-all hover:shadow-md">
                     <div className="flex items-center justify-between">
-                        <h3 className="text-slate-500 font-medium text-sm">CMV Geral (Mês)</h3>
+                        <h3 className="text-slate-500 font-medium text-sm">CMV Geral — {MESES[selMonth]}</h3>
                         <span className={`p-2 ${cmvBg} ${cmvColor} rounded-lg`}>
                             <TrendingDown className="w-5 h-5" />
                         </span>
@@ -239,7 +281,7 @@ export const Dashboard = () => {
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-lg font-bold text-slate-900 flex items-center">
                         <UtensilsCrossed className="w-5 h-5 mr-2 text-indigo-500" />
-                        Top Produtos com Melhor Margem (Mês)
+                        Top Produtos — {MESES[selMonth]} {selYear}
                     </h2>
                 </div>
 
@@ -256,7 +298,7 @@ export const Dashboard = () => {
                                 <div>
                                     <p className="font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors">{p.product_name}</p>
                                     <p className="text-sm text-slate-500 mt-0.5">
-                                        CMV: <span className={p.cmv < 30 ? 'text-green-600 font-medium' : p.cmv < 40 ? 'text-amber-600 font-medium' : 'text-red-600 font-medium'}>{p.cmv.toFixed(1)}%</span>
+                                        CMV: <span className={p.sale_price <= 0 ? 'text-slate-400 font-medium' : p.cmv < 30 ? 'text-green-600 font-medium' : p.cmv < 40 ? 'text-amber-600 font-medium' : 'text-red-600 font-medium'}>{p.sale_price > 0 ? `${p.cmv.toFixed(1)}%` : '—'}</span>
                                         {' • '}Custo: R$ {p.food_cost.toFixed(2)}
                                         {' • '}{p.total_sold} vendido(s)
                                     </p>
