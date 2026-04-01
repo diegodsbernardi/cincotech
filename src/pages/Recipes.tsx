@@ -262,7 +262,7 @@ export const Recipes = () => {
             supabase.from('recipe_sub_recipes').delete().eq('recipe_id', editingId),
         ]);
 
-        const insertOps: Promise<any>[] = [];
+        const insertOps: PromiseLike<any>[] = [];
         if (editIngItems.length > 0) {
             insertOps.push(supabase.from('recipe_ingredients').insert(
                 editIngItems.map(i => ({
