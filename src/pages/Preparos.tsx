@@ -36,6 +36,7 @@ export const Preparos = () => {
     const [editItemUnits, setEditItemUnits] = useState<Record<number, 'kg' | 'g'>>({});
     const [editPreparoName, setEditPreparoName] = useState('');
     const [editPreparoYield, setEditPreparoYield] = useState<number | ''>(1);
+    const [editPreparoUnit, setEditPreparoUnit] = useState('un');
     const [ingSearch, setIngSearch] = useState('');
     const [selectedIngId, setSelectedIngId] = useState('');
     const [editInputUnit, setEditInputUnit] = useState<'kg' | 'g'>('kg');
@@ -167,6 +168,7 @@ export const Preparos = () => {
         setEditItemUnits({});
         setEditPreparoName(preparo.product_name);
         setEditPreparoYield(preparo.yield_quantity);
+        setEditPreparoUnit(preparo.unit_type ?? 'un');
         setIngSearch(''); setSelectedIngId(''); setSelectedQty('');
     };
 
@@ -218,10 +220,11 @@ export const Preparos = () => {
         await supabase.from('recipes').update({
             product_name: editPreparoName.trim() || editingPreparo?.product_name,
             yield_quantity: Number(editPreparoYield) || 1,
+            unit_type: editPreparoUnit,
         }).eq('id', editingId);
 
         setPreparos(prev => prev.map(p => p.id === editingId
-            ? { ...p, product_name: editPreparoName.trim() || p.product_name, yield_quantity: Number(editPreparoYield) || 1 }
+            ? { ...p, product_name: editPreparoName.trim() || p.product_name, yield_quantity: Number(editPreparoYield) || 1, unit_type: editPreparoUnit }
             : p
         ));
         setCompositions(prev => ({ ...prev, [editingId]: editItems }));
@@ -547,7 +550,13 @@ export const Preparos = () => {
                                             onChange={e => setEditPreparoYield(e.target.value === '' ? '' : Number(e.target.value))}
                                             className="w-16 px-2 py-1.5 border border-slate-300 rounded-lg text-sm text-center focus:ring-2 focus:ring-amber-400 outline-none"
                                         />
-                                        <span className="text-xs text-slate-400">un</span>
+                                        <select
+                                            value={editPreparoUnit}
+                                            onChange={e => setEditPreparoUnit(e.target.value)}
+                                            className="px-1.5 py-1 border border-slate-300 rounded-lg text-xs text-slate-600 bg-white focus:ring-2 focus:ring-amber-400 outline-none"
+                                        >
+                                            {['un', 'kg', 'g', 'l', 'ml', 'porção'].map(u => <option key={u} value={u}>{u}</option>)}
+                                        </select>
                                     </div>
                                 </div>
                             </div>
