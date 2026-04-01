@@ -484,6 +484,7 @@ export const Ingredients = () => {
                                         type="number"
                                         value={editCost}
                                         onChange={e => setEditCost(e.target.value === '' ? '' : Number(e.target.value))}
+                                        onFocus={e => e.target.select()}
                                         className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
                                     />
                                 </div>
@@ -493,6 +494,7 @@ export const Ingredients = () => {
                                         type="number"
                                         value={editStock}
                                         onChange={e => setEditStock(e.target.value === '' ? '' : Number(e.target.value))}
+                                        onFocus={e => e.target.select()}
                                         className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
                                     />
                                 </div>

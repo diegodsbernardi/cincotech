@@ -589,9 +589,13 @@ export const Recipes = () => {
                                                 <input
                                                     type="number"
                                                     value={item.quantity_needed}
+                                                    min="0.001"
+                                                    onFocus={e => e.target.select()}
                                                     onChange={e => {
+                                                        const v = Number(e.target.value);
+                                                        if (v <= 0) return;
                                                         const next = [...editSubItems];
-                                                        next[idx] = { ...next[idx], quantity_needed: Number(e.target.value) };
+                                                        next[idx] = { ...next[idx], quantity_needed: v };
                                                         setEditSubItems(next);
                                                     }}
                                                     className="w-16 px-2 py-1 border border-amber-200 rounded-lg text-right text-sm focus:ring-2 focus:ring-amber-400 outline-none bg-white"
@@ -625,9 +629,13 @@ export const Recipes = () => {
                                                 <input
                                                     type="number"
                                                     value={item.quantity_needed}
+                                                    min="0.001"
+                                                    onFocus={e => e.target.select()}
                                                     onChange={e => {
+                                                        const v = Number(e.target.value);
+                                                        if (v <= 0) return;
                                                         const next = [...editIngItems];
-                                                        next[idx] = { ...next[idx], quantity_needed: Number(e.target.value) };
+                                                        next[idx] = { ...next[idx], quantity_needed: v };
                                                         setEditIngItems(next);
                                                     }}
                                                     className="w-16 px-2 py-1 border border-blue-200 rounded-lg text-right text-sm focus:ring-2 focus:ring-blue-400 outline-none bg-white"
